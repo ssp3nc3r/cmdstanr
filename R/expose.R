@@ -124,6 +124,19 @@ rcpp_source_stan <- function(code, env, verbose = FALSE, ...) {
     mustWork = TRUE
   )
   cmdstanr_includes <- paste0(" -I\"", cmdstanr_includes, "\"")
+  # Force-include the model's user header, as CmdStan's makefile does with
+  # -include $(USER_HEADER), so functions declared in the Stan program and
+  # defined in the header are found. Including the file by path, rather than
+  # pasting its text into `code`, lets its own relative #includes resolve
+  # against its directory. (#1197)
+  if (!is.null(env$user_header_)) {
+    cmdstanr_includes <- paste0(
+      cmdstanr_includes,
+      " -include \"",
+      env$user_header_,
+      "\""
+    )
+  }
   if (!is.null(tbb)) {
     cxxflags <- paste0(cxxflags, " -I", shQuote(tbb$include))
     # make's print rule drops the quotes, so quote the path here
@@ -190,7 +203,10 @@ drop_stale_model_methods <- function(env) {
   ) {
     return(invisible(FALSE))
   }
-  rm(list = setdiff(ls(env, all.names = TRUE), "hpp_code_"), envir = env)
+  rm(
+    list = setdiff(ls(env, all.names = TRUE), c("hpp_code_", "user_header_")),
+    envir = env
+  )
   invisible(TRUE)
 }
 
@@ -209,7 +225,10 @@ drop_stale_standalone_functions <- function(env) {
   ) {
     return(invisible(FALSE))
   }
-  rm(list = setdiff(ls(env, all.names = TRUE), "hpp_code"), envir = env)
+  rm(
+    list = setdiff(ls(env, all.names = TRUE), c("hpp_code", "user_header_")),
+    envir = env
+  )
   env$compiled <- FALSE
   invisible(TRUE)
 }

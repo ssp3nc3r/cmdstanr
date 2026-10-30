@@ -511,3 +511,60 @@ test_that("init_model_methods(quiet = TRUE) suppresses the message", {
   )
   expect_no_message(readRDS(temp_rds_file)$init_model_methods(quiet = TRUE))
 })
+
+test_that("model methods and functions work with a user_header (#1197)", {
+  # make_odds() is declared in the Stan program and defined in the header, in
+  # the model's namespace. The header pulls the definition in through a
+  # relative #include, so it only compiles if the header is included by path.
+  header_dir <- withr::local_tempdir()
+  writeLines(
+    c(
+      "#include <stan/math.hpp>",
+      "#include <ostream>",
+      "namespace bernoulli_external_model_namespace {",
+      "template <typename T0__,",
+      "          stan::require_all_t<stan::is_stan_scalar<T0__>>* = nullptr>",
+      "stan::promote_args_t<T0__> make_odds(const T0__& theta,",
+      "                                     std::ostream* pstream__) {",
+      "  return theta / (1 - theta);",
+      "}",
+      "}"
+    ),
+    file.path(header_dir, "make_odds_impl.hpp")
+  )
+  header <- file.path(header_dir, "make_odds.hpp")
+  writeLines("#include \"make_odds_impl.hpp\"", header)
+  mod <- cmdstan_model(
+    testing_stan_file("bernoulli_external"),
+    dir = withr::local_tempdir(),
+    user_header = header,
+    force_recompile = TRUE
+  )
+  utils::capture.output(
+    fit <- mod$sample(data = data_list, chains = 1, refresh = 0)
+  )
+
+  expect_no_error(fit$init_model_methods())
+  theta <- stats::plogis(0.1)
+  expect_equal(
+    fit$log_prob(unconstrained_variables = 0.1, jacobian = FALSE),
+    2 * log(theta) + 8 * log1p(-theta)
+  )
+  expect_equal(
+    fit$constrain_variables(0.1)$odds,
+    theta / (1 - theta)
+  )
+
+  mod$expose_functions(quiet = TRUE)
+  expect_equal(mod$functions$make_odds(0.25), 1 / 3)
+  fit$expose_functions(global = TRUE, quiet = TRUE)
+  withr::defer(rm("make_odds", envir = globalenv()))
+  expect_equal(make_odds(0.25), 1 / 3)
+
+  # A reloaded fit compiles its methods again and still finds the header
+  temp_rds_file <- tempfile(fileext = ".RDS")
+  saveRDS(fit, temp_rds_file)
+  fit2 <- readRDS(temp_rds_file)
+  expect_no_error(fit2$init_model_methods())
+  expect_equal(fit2$constrain_variables(0.1)$odds, theta / (1 - theta))
+})

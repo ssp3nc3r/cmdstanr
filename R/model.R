@@ -377,6 +377,10 @@ CmdStanModel <- R6::R6Class(
             )
           )
         )
+        if (!is.null(private$user_header_)) {
+          # rcpp_source_stan() force-includes it when compiling the functions
+          self$functions$user_header_ <- private$user_header_
+        }
       }
       self$functions
     }
@@ -447,6 +451,10 @@ CmdStanModel <- R6::R6Class(
       private$cmdstan_version_ <- facts$version
       private$user_header_ <-
         facts$record$dependencies[["user_header"]][["built_from"]]
+      if (!is.null(private$model_methods_env_) && !is.null(private$user_header_)) {
+        # rcpp_source_stan() force-includes it when compiling the methods
+        private$model_methods_env_$user_header_ <- private$user_header_
+      }
       invisible(self)
     },
     include_paths = function() {

@@ -289,6 +289,10 @@ occasionally crashes R or returns a list with wrong elements. (#1001)
 * `$expose_functions(global = TRUE)` now also puts the functions in the
 `$functions` field of the model or fit, so a later `$expose_functions()` call
 works. (#1317)
+* `fit$init_model_methods()` and `$expose_functions()` now work for models with
+a `user_header`. The header is force-included when the methods and functions
+compile, as CmdStan's makefile does, so headers that `#include` other headers
+by relative path work too. (#1197)
 * `cmdstan_make_local(cpp_options = list(stan_threads = FALSE))`, and the same
 argument of `install_cmdstan()`, now turn threading off. Previously they turned
 it on. (#605)
