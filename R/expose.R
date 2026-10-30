@@ -136,6 +136,14 @@ rcpp_source_stan <- function(code, env, verbose = FALSE, ...) {
       env$user_header_,
       "\""
     )
+    if (os_is_macos()) {
+      # A header that includes Accelerate gets vDSP.h's legacy COMPLEX typedef,
+      # which collides with the COMPLEX() that R's headers declare
+      cmdstanr_includes <- paste0(
+        cmdstanr_includes,
+        " -DUSE_NON_APPLE_STANDARD_DATATYPES=0"
+      )
+    }
   }
   if (!is.null(tbb)) {
     cxxflags <- paste0(cxxflags, " -I", shQuote(tbb$include))
